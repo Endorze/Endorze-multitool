@@ -1,0 +1,218 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Urgency {
+  NORMAL
+  IMPORTANT
+  DEADLINE
+}
+
+enum ReminderMode {
+  NONE
+  PUSH
+  EMAIL
+  BOTH
+}
+
+enum ReminderChannel {
+  PUSH
+  EMAIL
+}
+
+enum NotificationType {
+  DEADLINE_DAY_BEFORE
+  DEADLINE_SAME_DAY
+  TIME_ONE_HOUR_BEFORE
+}
+
+enum TrackingMode {
+  CHECKABLE
+  REMINDER_ONLY
+}
+
+enum TaskVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+model User {
+  id                String             @id @default(cuid())
+  name              String?
+  email             String             @unique
+  friendCode        String             @unique @default(cuid())
+  emailVerified     DateTime?
+  image             String?
+  timeZone          String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  accounts          Account[]
+  sessions          Session[]
+  tasks             Task[]
+  recurringEvents   RecurringEvent[]
+  pushSubscriptions PushSubscription[]
+  notificationLogs  NotificationLog[]
+
+  sentFriendRequests     FriendRequest[] @relation("SentFriendRequests")
+  receivedFriendRequests FriendRequest[] @relation("ReceivedFriendRequests")
+
+  friendshipsA Friendship[] @relation("FriendshipA")
+  friendshipsB Friendship[] @relation("FriendshipB")
+}
+
+model FriendRequest {
+  id         String              @id @default(cuid())
+  status     FriendRequestStatus @default(PENDING)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  senderId   String
+  sender     User @relation("SentFriendRequests", fields: [senderId], references: [id], onDelete: Cascade)
+
+  receiverId String
+  receiver   User @relation("ReceivedFriendRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@index([receiverId, status])
+  @@index([senderId, status])
+}
+
+model Friendship {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userAId String
+  userA   User @relation("FriendshipA", fields: [userAId], references: [id], onDelete: Cascade)
+
+  userBId String
+  userB   User @relation("FriendshipB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
+}
+
+model RecurringEvent {
+  id               String            @id @default(cuid())
+  title            String
+  time             String?
+  urgency          Urgency           @default(NORMAL)
+  reminderMode     ReminderMode      @default(NONE)
+  trackingMode     TrackingMode      @default(REMINDER_ONLY)
+  visibility       TaskVisibility    @default(PUBLIC)
+  daysCsv          String
+  startDate        DateTime
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tasks            Task[]
+
+  @@index([userId, active])
+}
+
+model Task {
+  id               String            @id @default(cuid())
+  title            String
+  date             DateTime
+  time             String?
+  done             Boolean           @default(false)
+  urgency          Urgency           @default(NORMAL)
+  reminderMode     ReminderMode      @default(NONE)
+  trackingMode     TrackingMode      @default(CHECKABLE)
+  visibility       TaskVisibility    @default(PUBLIC)
+  reminderSent     Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  recurringEventId String?
+  recurringEvent   RecurringEvent?   @relation(fields: [recurringEventId], references: [id], onDelete: Cascade)
+
+  notificationLogs NotificationLog[]
+
+  @@index([userId, date])
+  @@index([recurringEventId])
+  @@index([visibility])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NotificationLog {
+  id       String           @id @default(cuid())
+  type     NotificationType
+  channel  ReminderChannel
+  sentAt   DateTime         @default(now())
+
+  taskId   String
+  task     Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  userId   String
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, type, channel])
+  @@index([userId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

@@ -1,0 +1,376 @@
+@import "react-day-picker/dist/style.css";
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --bg-start: #eef2f8;
+  --bg-end: #dbe5ef;
+  --panel: rgba(255, 255, 255, 0.74);
+  --panel-strong: rgba(255, 255, 255, 0.9);
+  --panel-soft: rgba(255, 255, 255, 0.58);
+  --line: rgba(15, 23, 42, 0.1);
+  --line-strong: rgba(15, 23, 42, 0.16);
+  --text-main: #0f172a;
+  --text-soft: rgba(15, 23, 42, 0.66);
+  --text-faint: rgba(15, 23, 42, 0.42);
+  --accent-cyan: #06b6d4;
+  --accent-cyan-soft: rgba(6, 182, 212, 0.14);
+  --accent-indigo-soft: rgba(99, 102, 241, 0.14);
+  --accent-emerald-soft: rgba(16, 185, 129, 0.12);
+  --calendar-surface: rgba(255, 255, 255, 0.78);
+  --input-bg: rgba(255, 255, 255, 0.72);
+  --shadow-lg: 0 24px 80px rgba(15, 23, 42, 0.12);
+  --shadow-md: 0 14px 40px rgba(15, 23, 42, 0.1);
+  --dock-bg: rgba(12, 16, 28, 0.78);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg-start: #09111d;
+    --bg-end: #101a2b;
+    --panel: rgba(255, 255, 255, 0.06);
+    --panel-strong: rgba(255, 255, 255, 0.08);
+    --panel-soft: rgba(255, 255, 255, 0.04);
+    --line: rgba(255, 255, 255, 0.09);
+    --line-strong: rgba(255, 255, 255, 0.14);
+    --text-main: #f8fafc;
+    --text-soft: rgba(248, 250, 252, 0.7);
+    --text-faint: rgba(248, 250, 252, 0.4);
+    --accent-cyan: #67e8f9;
+    --accent-cyan-soft: rgba(103, 232, 249, 0.12);
+    --accent-indigo-soft: rgba(129, 140, 248, 0.18);
+    --accent-emerald-soft: rgba(52, 211, 153, 0.14);
+    --calendar-surface: rgba(9, 17, 29, 0.7);
+    --input-bg: rgba(255, 255, 255, 0.045);
+    --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.34);
+    --shadow-md: 0 14px 40px rgba(0, 0, 0, 0.24);
+    --dock-bg: rgba(8, 11, 20, 0.86);
+  }
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(99, 102, 241, 0.14), transparent 24%),
+    radial-gradient(circle at top right, rgba(20, 184, 166, 0.1), transparent 18%),
+    linear-gradient(160deg, var(--bg-start), var(--bg-end));
+  color: var(--text-main);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.app-shell {
+  background:
+    radial-gradient(circle at top left, rgba(129, 140, 248, 0.08), transparent 18%),
+    radial-gradient(circle at top right, rgba(45, 212, 191, 0.08), transparent 16%);
+}
+
+.landing-shell {
+  background:
+    radial-gradient(circle at top left, rgba(99, 102, 241, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(20, 184, 166, 0.16), transparent 24%),
+    linear-gradient(160deg, #07111f, #0f1c2e);
+}
+
+.landing-hero,
+.landing-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(18px);
+}
+
+.desktop-hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.desktop-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top right, rgba(103, 232, 249, 0.08), transparent 18%),
+    radial-gradient(circle at bottom left, rgba(99, 102, 241, 0.08), transparent 20%);
+  pointer-events: none;
+}
+
+.music-hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.music-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgba(99, 102, 241, 0.18), transparent 36%),
+    linear-gradient(180deg, rgba(168, 85, 247, 0.16), transparent 70%);
+  pointer-events: none;
+}
+
+.music-list {
+  background:
+    linear-gradient(180deg, rgba(99, 102, 241, 0.06), transparent 22%),
+    var(--calendar-surface);
+  border: 1px solid var(--line);
+}
+
+.music-empty-state {
+  border: 1px dashed var(--line);
+  background: var(--panel-soft);
+}
+
+.music-dock {
+  background: var(--dock-bg);
+  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.18);
+}
+
+.music-control-btn {
+  display: grid;
+  height: 2.5rem;
+  width: 2.5rem;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-soft);
+  transition: 180ms ease;
+}
+
+.music-control-btn:hover {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+}
+
+.music-control-active {
+  color: #67e8f9;
+  border-color: rgba(103, 232, 249, 0.18);
+  background: rgba(103, 232, 249, 0.1);
+}
+
+.music-control-main {
+  display: grid;
+  height: 3rem;
+  width: 3rem;
+  place-items: center;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #f8fafc, #dbeafe);
+  color: #0f172a;
+  transition: 180ms ease;
+}
+
+.music-control-main:hover {
+  transform: scale(1.04);
+}
+
+.planner-day-picker .rdp-root {
+  --rdp-accent-color: #6366f1;
+  --rdp-accent-background-color: rgba(99, 102, 241, 0.16);
+  margin: 0;
+}
+
+.planner-day-picker .rdp-chevron {
+  fill: currentColor;
+}
+
+.has-task-day .planner-day-button::after {
+  content: "";
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--accent-cyan);
+}
+
+.theme-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(18px);
+}
+
+.theme-panel-strong {
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(18px);
+}
+
+.theme-surface {
+  background: var(--calendar-surface);
+  border: 1px solid var(--line);
+}
+
+.theme-input {
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  color: var(--text-main);
+}
+
+.theme-input::placeholder {
+  color: var(--text-faint);
+}
+
+.theme-muted {
+  color: var(--text-soft);
+}
+
+.theme-faint {
+  color: var(--text-faint);
+}
+
+.theme-card {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+}
+
+.theme-pill {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+}
+
+.theme-button-soft {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  color: var(--text-main);
+}
+
+.theme-button-soft:hover {
+  background: var(--panel-strong);
+}
+
+.theme-button-accent {
+  background: var(--accent-cyan-soft);
+  border: 1px solid rgba(6, 182, 212, 0.24);
+  color: var(--text-main);
+}
+
+.theme-button-accent:hover {
+  filter: brightness(1.04);
+}
+
+.app-titlebar {
+  background: color-mix(in srgb, var(--panel-strong) 88%, transparent);
+  backdrop-filter: blur(18px);
+  user-select: none;
+}
+
+.app-window-btn {
+  display: grid;
+  height: 30px;
+  width: 38px;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--text-soft);
+  transition: 160ms ease;
+}
+
+.app-window-btn:hover {
+  background: var(--panel-soft);
+  color: var(--text-main);
+}
+
+.app-window-btn-close:hover {
+  background: rgba(244, 63, 94, 0.16);
+  color: #fb7185;
+}
+
+.music-dock {
+  background: color-mix(in srgb, var(--panel-strong) 86%, transparent);
+  box-shadow: 0 -18px 60px rgba(15, 23, 42, 0.14);
+}
+
+.music-cover {
+  display: grid;
+  height: 48px;
+  width: 48px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(circle at top left, rgba(103, 232, 249, 0.22), transparent 42%),
+    var(--panel-soft);
+  color: var(--text-main);
+}
+
+.music-control-btn {
+  display: grid;
+  height: 42px;
+  width: 42px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  color: var(--text-soft);
+  transition: 160ms ease;
+}
+
+.music-control-btn:hover {
+  background: var(--panel-strong);
+  color: var(--text-main);
+  transform: translateY(-1px);
+}
+
+.music-control-active {
+  background: var(--accent-cyan-soft);
+  border-color: rgba(6, 182, 212, 0.28);
+  color: var(--accent-cyan);
+}
+
+.music-control-main {
+  display: grid;
+  height: 50px;
+  width: 50px;
+  place-items: center;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #67e8f9, #818cf8);
+  color: #07111f;
+  box-shadow: 0 14px 34px rgba(99, 102, 241, 0.28);
+  transition: 160ms ease;
+}
+
+.music-control-main:hover {
+  transform: scale(1.04);
+  filter: brightness(1.04);
+}
+
+.app-nav-btn {
+  display: grid;
+  height: 30px;
+  width: 34px;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--text-soft);
+  transition: 160ms ease;
+}
+
+.app-nav-btn:hover:not(:disabled) {
+  background: var(--panel-soft);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.app-nav-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+
+.tools-panel {
+  background: color-mix(in srgb, var(--panel-strong) 92%, transparent);
+  backdrop-filter: blur(20px);
+}
