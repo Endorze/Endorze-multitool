@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { DayPicker } from "react-day-picker";
 import { formatDaysCsv, toDayKey } from "@/lib/recurring";
 import { getDemoSharedTasks } from "@/lib/demo-shared-calendar";
 
 type UiUrgency = "normal" | "important" | "deadline";
-type UiReminderChannel = "push" | "email" | "none" | "both";
+type UiReminderChannel = "push" | "none";
 type UiTrackingMode = "checkable" | "reminder_only";
 type UiTaskVisibility = "public" | "private";
 
@@ -131,11 +131,7 @@ function getTrackingLabel(trackingMode: UiTrackingMode) {
 function getReminderLabel(reminderChannel?: UiReminderChannel) {
   switch (reminderChannel) {
     case "push":
-      return "Push only";
-    case "email":
-      return "Email only";
-    case "both":
-      return "Push + Email";
+      return "Desktop reminder";
     default:
       return "No reminder";
   }
@@ -390,10 +386,27 @@ export default function PlannerDashboard({
 }: PlannerDashboardProps) {
   const today = useMemo(() => startOfToday(), []);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
-  const [tasks, setTasks] = useState<UiTask[]>(() => [
-    ...initialTasks,
-    ...getDemoSharedTasks(),
-  ]);
+  const [tasks, setTasks] = useState<UiTask[]>(initialTasks);
+
+useEffect(() => {
+  setTasks((current) => {
+    const withoutDemo = current.filter((task) => !task.id.startsWith("demo-task-"));
+    return [...withoutDemo, ...getDemoSharedTasks()];
+  });
+
+  function handleDemoFriendChange() {
+    setTasks((current) => {
+      const withoutDemo = current.filter((task) => !task.id.startsWith("demo-task-"));
+      return [...withoutDemo, ...getDemoSharedTasks()];
+    });
+  }
+
+  window.addEventListener("demo-friend-changed", handleDemoFriendChange);
+
+  return () => {
+    window.removeEventListener("demo-friend-changed", handleDemoFriendChange);
+  };
+}, []);
   const [recurringEvents, setRecurringEvents] =
     useState<UiRecurringEvent[]>(initialRecurringEvents);
 
@@ -901,9 +914,7 @@ export default function PlannerDashboard({
                     className="theme-input h-12 rounded-2xl px-4 outline-none focus:border-indigo-300/30 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <option value="none">No reminder</option>
-                    <option value="push">Push only</option>
-                    <option value="email">Email only</option>
-                    <option value="both">Push + Email</option>
+                    <option value="push">Desktop reminder</option>
                   </select>
                 </label>
 
@@ -1052,8 +1063,6 @@ export default function PlannerDashboard({
                 >
                   <option value="none">No reminder</option>
                   <option value="push">Push only</option>
-                  <option value="email">Email only</option>
-                  <option value="both">Push + Email</option>
                 </select>
               </label>
 

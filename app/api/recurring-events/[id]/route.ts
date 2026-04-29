@@ -25,7 +25,7 @@ const recurringSchema = z.object({
     .or(z.literal("")),
   urgency: z.enum(["normal", "important", "deadline"]).default("normal"),
   reminderMode: z
-    .enum(["none", "push", "email", "both"])
+    .enum(["none", "push"])
     .optional()
     .or(z.literal("")),
   trackingMode: z

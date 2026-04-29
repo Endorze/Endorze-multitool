@@ -20,8 +20,9 @@ import ToolsPanel from "@/components/tools-panel";
 import SharedCalendarsPanel from "@/components/shared-calendars-panel";
 
 type UiUrgency = "normal" | "important" | "deadline";
-type UiReminderChannel = "push" | "email" | "none" | "both";
+type UiReminderChannel = "push" | "none";
 type UiTrackingMode = "checkable" | "reminder_only";
+type UiTaskVisibility = "public" | "private";
 
 type UiTask = {
   id: string;
@@ -31,8 +32,15 @@ type UiTask = {
   done: boolean;
   urgency: UiUrgency;
   trackingMode: UiTrackingMode;
+  visibility?: UiTaskVisibility;
+  reminderMode?: UiReminderChannel;
   reminderChannel?: UiReminderChannel;
   recurringEventId?: string;
+
+  ownerId?: string;
+  ownerName?: string;
+  ownerEmail?: string;
+  readonly?: boolean;
 };
 
 type UiRecurringEvent = {
@@ -41,6 +49,8 @@ type UiRecurringEvent = {
   time: string;
   urgency: UiUrgency;
   trackingMode: UiTrackingMode;
+  visibility?: UiTaskVisibility;
+  reminderMode?: UiReminderChannel;
   reminderChannel?: UiReminderChannel;
   daysCsv: string;
   startDate: string;

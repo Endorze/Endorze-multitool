@@ -18,18 +18,18 @@ export function useMusicPlayer() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    audioRef.current = new Audio();
+    const audio = new Audio();
+    audioRef.current = audio;
 
     return () => {
-      audioRef.current?.pause();
+      audio.pause();
       audioRef.current = null;
     };
   }, []);
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
-    if (!tracks.length) return;
+    if (!audio || !tracks.length) return;
 
     const currentTrack = tracks[currentIndex];
     if (!currentTrack) return;
@@ -48,9 +48,12 @@ export function useMusicPlayer() {
     if (!audio) return;
 
     function handleEnded() {
+      const activeAudio = audioRef.current;
+      if (!activeAudio) return;
+
       if (loop) {
-        audio.currentTime = 0;
-        void audio.play();
+        activeAudio.currentTime = 0;
+        void activeAudio.play();
         return;
       }
 
@@ -65,12 +68,13 @@ export function useMusicPlayer() {
         return;
       }
 
-      setCurrentIndex((prev) => {
-        if (prev >= tracks.length - 1) {
+      setCurrentIndex((previousIndex) => {
+        if (previousIndex >= tracks.length - 1) {
           setIsPlaying(false);
-          return prev;
+          return previousIndex;
         }
-        return prev + 1;
+
+        return previousIndex + 1;
       });
     }
 
@@ -83,23 +87,27 @@ export function useMusicPlayer() {
 
   function playPause() {
     const audio = audioRef.current;
-    if (!audio) return;
-    if (!tracks.length) return;
+    if (!audio || !tracks.length) return;
 
     if (isPlaying) {
       audio.pause();
       setIsPlaying(false);
-    } else {
-      void audio.play().then(() => {
+      return;
+    }
+
+    void audio
+      .play()
+      .then(() => {
         setIsPlaying(true);
-      }).catch(() => {
+      })
+      .catch(() => {
         setIsPlaying(false);
       });
-    }
   }
 
   function loadTrack(index: number) {
     if (!tracks[index]) return;
+
     setCurrentIndex(index);
     setIsPlaying(true);
   }
@@ -114,14 +122,16 @@ export function useMusicPlayer() {
       return;
     }
 
-    setCurrentIndex((prev) => (prev + 1) % tracks.length);
+    setCurrentIndex((previousIndex) => (previousIndex + 1) % tracks.length);
     setIsPlaying(true);
   }
 
   function prev() {
     if (!tracks.length) return;
 
-    setCurrentIndex((prev) => (prev - 1 + tracks.length) % tracks.length);
+    setCurrentIndex(
+      (previousIndex) => (previousIndex - 1 + tracks.length) % tracks.length
+    );
     setIsPlaying(true);
   }
 
@@ -132,23 +142,29 @@ export function useMusicPlayer() {
       url: URL.createObjectURL(file),
     };
 
-    setTracks((prev) => [...prev, track]);
+    setTracks((previousTracks) => [...previousTracks, track]);
   }
 
   function removeTrack(id: string) {
-    setTracks((prev) => {
-      const indexToRemove = prev.findIndex((track) => track.id === id);
-      if (indexToRemove === -1) return prev;
+    setTracks((previousTracks) => {
+      const indexToRemove = previousTracks.findIndex((track) => track.id === id);
 
-      const nextTracks = prev.filter((track) => track.id !== id);
+      if (indexToRemove === -1) return previousTracks;
+
+      const nextTracks = previousTracks.filter((track) => track.id !== id);
 
       if (!nextTracks.length) {
-        audioRef.current?.pause();
-        if (audioRef.current) {
-          audioRef.current.src = "";
+        const audio = audioRef.current;
+
+        audio?.pause();
+
+        if (audio) {
+          audio.src = "";
         }
+
         setCurrentIndex(0);
         setIsPlaying(false);
+
         return nextTracks;
       }
 
@@ -157,11 +173,13 @@ export function useMusicPlayer() {
         setIsPlaying(false);
 
         const safeNextIndex =
-          currentIndex >= nextTracks.length ? nextTracks.length - 1 : currentIndex;
+          currentIndex >= nextTracks.length
+            ? nextTracks.length - 1
+            : currentIndex;
 
         setCurrentIndex(Math.max(0, safeNextIndex));
       } else if (indexToRemove < currentIndex) {
-        setCurrentIndex((prevIndex) => Math.max(0, prevIndex - 1));
+        setCurrentIndex((previousIndex) => Math.max(0, previousIndex - 1));
       }
 
       return nextTracks;

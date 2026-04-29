@@ -10,7 +10,7 @@ type UiTask = {
   time: string;
   done: boolean;
   urgency: "normal" | "important" | "deadline";
-  reminderChannel?: "push" | "email" | "none" | "both";
+  reminderMode?: "none" | "push" | "email" | "both";
 };
 
 type ApiResponse = {
@@ -34,6 +34,10 @@ function tomorrowKey() {
   const m = `${date.getMonth() + 1}`.padStart(2, "0");
   const d = `${date.getDate()}`.padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+function wantsDesktopReminder(task: UiTask) {
+  return task.reminderMode === "push" || task.reminderMode === "both";
 }
 
 function minutesUntilTask(task: UiTask) {
@@ -69,6 +73,8 @@ export default function DesktopTaskReminderRunner() {
         const tomorrow = tomorrowKey();
 
         for (const task of data.tasks) {
+          if (task.done || !wantsDesktopReminder(task)) continue;
+
           if (task.urgency === "deadline" && task.date === tomorrow) {
             const key = `desktop-reminder:${task.id}:deadline-tomorrow`;
 

@@ -14,6 +14,7 @@ import {
   toStoredDate,
 } from "@/lib/recurring";
 
+// 🔥 STRICT schema (no email)
 const recurringSchema = z.object({
   title: z.string().trim().min(1).max(160),
   time: z
@@ -22,10 +23,7 @@ const recurringSchema = z.object({
     .optional()
     .or(z.literal("")),
   urgency: z.enum(["normal", "important", "deadline"]).default("normal"),
-  reminderMode: z
-    .enum(["none", "push", "email", "both"])
-    .optional()
-    .or(z.literal("")),
+  reminderMode: z.enum(["none", "push"]).optional().or(z.literal("")),
   trackingMode: z
     .enum(["checkable", "reminder_only"])
     .optional()
@@ -55,9 +53,7 @@ export async function POST(request: Request) {
     const rows = buildRecurringTaskRows(event);
 
     if (rows.length > 0) {
-      await prisma.task.createMany({
-        data: rows,
-      });
+      await prisma.task.createMany({ data: rows });
     }
 
     const today = startOfToday();
@@ -79,7 +75,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       event: serializeRecurringEvent(event),
-      tasks: generatedTasks.map(serializeTask),
+      tasks: generatedTasks.map((task) =>
+        serializeTask(task, user.id)
+      ),
     });
   } catch (error) {
     return NextResponse.json(

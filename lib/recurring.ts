@@ -19,7 +19,7 @@ export const WEEKDAY_OPTIONS = [
   { value: 0, label: "Sun" },
 ] as const;
 
-export type SerializedReminderMode = "none" | "push" | "email" | "both";
+export type SerializedReminderMode = "none" | "push";
 export type SerializedTaskVisibility = "public" | "private";
 
 export type SerializedTask = {
@@ -78,16 +78,16 @@ export function parseDaysCsv(daysCsv: string) {
   return new Set(
     daysCsv
       .split(",")
-      .map((v) => Number(v))
-      .filter((v) => Number.isInteger(v) && v >= 0 && v <= 6)
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value >= 0 && value <= 6)
   );
 }
 
 export function formatDaysCsv(daysCsv: string) {
-  const set = parseDaysCsv(daysCsv);
+  const selectedDays = parseDaysCsv(daysCsv);
 
-  return WEEKDAY_OPTIONS.filter((d) => set.has(d.value))
-    .map((d) => d.label)
+  return WEEKDAY_OPTIONS.filter((day) => selectedDays.has(day.value))
+    .map((day) => day.label)
     .join(" • ");
 }
 
@@ -113,8 +113,6 @@ export function normalizeReminderMode(
   reminder?: SerializedReminderMode | ""
 ): ReminderMode {
   if (reminder === "push") return "PUSH";
-  if (reminder === "email") return "EMAIL";
-  if (reminder === "both") return "BOTH";
   return "NONE";
 }
 
@@ -127,8 +125,6 @@ export function normalizeTaskVisibility(
 
 function serializeReminderMode(value: ReminderMode): SerializedReminderMode {
   if (value === "PUSH") return "push";
-  if (value === "EMAIL") return "email";
-  if (value === "BOTH") return "both";
   return "none";
 }
 
@@ -176,7 +172,9 @@ export function serializeTask(
   viewerUserId?: string
 ): SerializedTask {
   const ownerId = task.user?.id ?? task.userId;
-  const isSharedTask = Boolean(viewerUserId && ownerId && ownerId !== viewerUserId);
+  const isSharedTask = Boolean(
+    viewerUserId && ownerId && ownerId !== viewerUserId
+  );
 
   return {
     id: task.id,

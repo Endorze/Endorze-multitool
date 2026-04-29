@@ -23,7 +23,7 @@ const createTaskSchema = z.object({
     .or(z.literal("")),
   urgency: z.enum(["normal", "important", "deadline"]).default("normal"),
   reminderMode: z
-    .enum(["none", "push", "email", "both"])
+    .enum(["none", "push"])
     .optional()
     .or(z.literal("")),
   trackingMode: z
@@ -105,7 +105,7 @@ export async function POST(request: Request) {
         time: body.time || null,
         done: false,
         urgency: normalizeUrgency(body.urgency),
-        reminderMode: normalizeReminderMode(body.reminderMode),
+        reminderMode: normalizeReminderMode(body.reminderMode ?? "none"),
         trackingMode: normalizeTrackingMode(body.urgency, body.trackingMode),
         visibility: normalizeTaskVisibility(body.visibility),
         userId: user.id,
