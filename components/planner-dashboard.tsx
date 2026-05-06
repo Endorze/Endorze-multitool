@@ -1,68 +1,17 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { DayPicker } from "react-day-picker";
-import { formatDaysCsv, toDayKey } from "@/lib/recurring";
-import { getDemoSharedTasks } from "@/lib/demo-shared-calendar";
-
-type UiUrgency = "normal" | "important" | "deadline";
-type UiReminderChannel = "push" | "none";
-type UiTrackingMode = "checkable" | "reminder_only";
-type UiTaskVisibility = "public" | "private";
-
-type UiTask = {
-  id: string;
-  title: string;
-  date: string;
-  time: string;
-  done: boolean;
-  urgency: UiUrgency;
-  trackingMode: UiTrackingMode;
-  visibility?: UiTaskVisibility;
-  reminderMode?: UiReminderChannel;
-  reminderChannel?: UiReminderChannel;
-  recurringEventId?: string;
-
-  ownerId?: string;
-  ownerName?: string;
-  ownerEmail?: string;
-  readonly?: boolean;
-};
-
-type UiRecurringEvent = {
-  id: string;
-  title: string;
-  time: string;
-  urgency: UiUrgency;
-  trackingMode: UiTrackingMode;
-  visibility?: UiTaskVisibility;
-  reminderMode?: UiReminderChannel;
-  reminderChannel?: UiReminderChannel;
-  daysCsv: string;
-  startDate: string;
-  active: boolean;
-};
-
-type PlannerDashboardProps = {
-  userName: string;
-  userEmail: string;
-  initialTasks: UiTask[];
-  recurringEvents: UiRecurringEvent[];
-};
-
-type TaskApiResponse = {
-  ok: boolean;
-  task?: UiTask;
-  error?: string;
-};
-
-type RecurringApiResponse = {
-  ok: boolean;
-  event?: UiRecurringEvent;
-  tasks?: UiTask[];
-  deletedTaskIds?: string[];
-  error?: string;
-};
+import {
+  formatDaysCsv,
+  toDayKey,
+  type SerializedRecurringEvent,
+  type SerializedTask,
+  type SerializedReminderMode,
+  type SerializedTrackingMode,
+  type SerializedUrgency,
+} from "@/lib/recurring";
+import { useAppData } from "@/providers/AppDataProviders";
 
 const weekdayOptions = [
   { value: 1, label: "Mon" },
@@ -73,14 +22,6 @@ const weekdayOptions = [
   { value: 6, label: "Sat" },
   { value: 0, label: "Sun" },
 ] as const;
-
-function getTaskReminderMode(task: UiTask) {
-  return task.reminderMode ?? task.reminderChannel ?? "none";
-}
-
-function getRecurringReminderMode(event: UiRecurringEvent) {
-  return event.reminderMode ?? event.reminderChannel ?? "none";
-}
 
 function fromDayKey(dayKey: string) {
   const [year, month, day] = dayKey.split("-").map(Number);
@@ -112,7 +53,7 @@ function formatShortDate(date: Date) {
   }).format(date);
 }
 
-function getUrgencyClasses(urgency: UiUrgency) {
+function getUrgencyClasses(urgency: SerializedUrgency) {
   if (urgency === "deadline") {
     return "border-rose-400/20 bg-rose-400/10 text-rose-200 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200";
   }
@@ -124,29 +65,12 @@ function getUrgencyClasses(urgency: UiUrgency) {
   return "border-indigo-400/20 bg-indigo-400/10 text-indigo-700 dark:border-indigo-300/15 dark:bg-indigo-300/10 dark:text-indigo-100";
 }
 
-function getTrackingLabel(trackingMode: UiTrackingMode) {
+function getTrackingLabel(trackingMode: SerializedTrackingMode) {
   return trackingMode === "checkable" ? "Checkable" : "Reminder only";
 }
 
-function getReminderLabel(reminderChannel?: UiReminderChannel) {
-  switch (reminderChannel) {
-    case "push":
-      return "Desktop reminder";
-    default:
-      return "No reminder";
-  }
-}
-
-function getVisibilityLabel(visibility?: UiTaskVisibility) {
-  return visibility === "private" ? "Private" : "Public";
-}
-
-function getVisibilityClasses(visibility?: UiTaskVisibility) {
-  if (visibility === "private") {
-    return "border-slate-400/20 bg-slate-400/10 text-slate-700 dark:text-slate-100";
-  }
-
-  return "border-cyan-300/20 bg-cyan-300/10 text-cyan-700 dark:text-cyan-100";
+function getReminderLabel(reminderMode?: SerializedReminderMode) {
+  return reminderMode === "push" ? "Desktop reminder" : "No reminder";
 }
 
 function CheckIcon({ done }: { done: boolean }) {
@@ -186,25 +110,6 @@ function BellDot() {
       >
         <path d="M15 17h5l-1.4-1.4a2 2 0 0 1-.6-1.4V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
         <path d="M10 20a2 2 0 0 0 4 0" />
-      </svg>
-    </span>
-  );
-}
-
-function ReadOnlyIcon() {
-  return (
-    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-rose-300/20 bg-rose-300/10 text-rose-700 dark:text-rose-100">
-      <svg
-        viewBox="0 0 24 24"
-        className="h-5 w-5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M16 11V7a4 4 0 0 0-8 0v4" />
-        <rect x="5" y="11" width="14" height="10" rx="2" />
       </svg>
     </span>
   );
@@ -276,12 +181,11 @@ function TaskCard({
   busyTaskId,
   onToggle,
 }: {
-  task: UiTask;
+  task: SerializedTask;
   busyTaskId: string | null;
   onToggle: (taskId: string) => void;
 }) {
-  const isShared = Boolean(task.readonly);
-  const canToggle = !isShared && task.trackingMode === "checkable";
+  const canToggle = task.trackingMode === "checkable";
 
   return (
     <button
@@ -295,13 +199,11 @@ function TaskCard({
         }`}
       style={{
         background: "var(--panel-soft)",
-        borderColor: isShared ? "rgba(251, 113, 133, 0.25)" : "var(--line)",
+        borderColor: "var(--line)",
       }}
     >
       <div className="flex items-start gap-3">
-        {isShared ? (
-          <ReadOnlyIcon />
-        ) : task.trackingMode === "checkable" ? (
+        {task.trackingMode === "checkable" ? (
           <CheckIcon done={task.done} />
         ) : (
           <BellDot />
@@ -318,12 +220,6 @@ function TaskCard({
               </p>
 
               <div className="mt-2 flex flex-wrap gap-2">
-                {isShared ? (
-                  <span className="inline-flex items-center rounded-full border border-rose-300/20 bg-rose-300/10 px-3 py-1 text-xs font-medium text-rose-700 dark:text-rose-100">
-                    Shared by {task.ownerName ?? task.ownerEmail ?? "friend"}
-                  </span>
-                ) : null}
-
                 <span
                   className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium capitalize ${getUrgencyClasses(
                     task.urgency
@@ -337,15 +233,7 @@ function TaskCard({
                 </span>
 
                 <span className="inline-flex items-center rounded-full theme-pill px-3 py-1 text-xs theme-muted">
-                  {getReminderLabel(getTaskReminderMode(task))}
-                </span>
-
-                <span
-                  className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${getVisibilityClasses(
-                    task.visibility
-                  )}`}
-                >
-                  {getVisibilityLabel(task.visibility)}
+                  {getReminderLabel(task.reminderMode)}
                 </span>
 
                 {task.time ? (
@@ -363,13 +251,11 @@ function TaskCard({
             </div>
 
             <div className="text-xs uppercase tracking-[0.16em] theme-faint">
-              {isShared
-                ? "Read only"
-                : task.trackingMode === "checkable"
-                  ? task.done
-                    ? "Completed"
-                    : "Tap to complete"
-                  : "Reminder only"}
+              {task.trackingMode === "checkable"
+                ? task.done
+                  ? "Completed"
+                  : "Tap to complete"
+                : "Reminder only"}
             </div>
           </div>
         </div>
@@ -378,48 +264,32 @@ function TaskCard({
   );
 }
 
-export default function PlannerDashboard({
-  userName,
-  userEmail,
-  initialTasks,
-  recurringEvents: initialRecurringEvents,
-}: PlannerDashboardProps) {
+export default function PlannerDashboard() {
+  const appData = useAppData();
+
+  const {
+    ready,
+    tasks,
+    recurringEvents,
+    addTask,
+    toggleTask,
+    deleteCompletedTasksForDate,
+    addRecurringEvent,
+    updateRecurringEvent,
+    deleteRecurringEvent,
+  } = appData;
+
   const today = useMemo(() => startOfToday(), []);
   const [selectedDate, setSelectedDate] = useState<Date>(today);
-  const [tasks, setTasks] = useState<UiTask[]>(initialTasks);
-
-useEffect(() => {
-  setTasks((current) => {
-    const withoutDemo = current.filter((task) => !task.id.startsWith("demo-task-"));
-    return [...withoutDemo, ...getDemoSharedTasks()];
-  });
-
-  function handleDemoFriendChange() {
-    setTasks((current) => {
-      const withoutDemo = current.filter((task) => !task.id.startsWith("demo-task-"));
-      return [...withoutDemo, ...getDemoSharedTasks()];
-    });
-  }
-
-  window.addEventListener("demo-friend-changed", handleDemoFriendChange);
-
-  return () => {
-    window.removeEventListener("demo-friend-changed", handleDemoFriendChange);
-  };
-}, []);
-  const [recurringEvents, setRecurringEvents] =
-    useState<UiRecurringEvent[]>(initialRecurringEvents);
 
   const [title, setTitle] = useState("");
-  const [urgency, setUrgency] = useState<UiUrgency>("normal");
+  const [urgency, setUrgency] = useState<SerializedUrgency>("normal");
   const [time, setTime] = useState("");
-  const [reminderChannel, setReminderChannel] =
-    useState<UiReminderChannel>("none");
+  const [reminderMode, setReminderMode] =
+    useState<SerializedReminderMode>("none");
   const [trackingMode, setTrackingMode] =
-    useState<UiTrackingMode>("reminder_only");
-  const [visibility, setVisibility] = useState<UiTaskVisibility>("public");
+    useState<SerializedTrackingMode>("reminder_only");
 
-  const [isSaving, setIsSaving] = useState(false);
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [status, setStatus] = useState("");
 
@@ -430,14 +300,12 @@ useEffect(() => {
 
   const [recurringTitle, setRecurringTitle] = useState("");
   const [recurringUrgency, setRecurringUrgency] =
-    useState<UiUrgency>("normal");
+    useState<SerializedUrgency>("normal");
   const [recurringTime, setRecurringTime] = useState("");
-  const [recurringReminderChannel, setRecurringReminderChannel] =
-    useState<UiReminderChannel>("none");
+  const [recurringReminderMode, setRecurringReminderMode] =
+    useState<SerializedReminderMode>("none");
   const [recurringTrackingMode, setRecurringTrackingMode] =
-    useState<UiTrackingMode>("reminder_only");
-  const [recurringVisibility, setRecurringVisibility] =
-    useState<UiTaskVisibility>("public");
+    useState<SerializedTrackingMode>("reminder_only");
   const [recurringDays, setRecurringDays] = useState<number[]>([1]);
   const [editingRecurringId, setEditingRecurringId] = useState<string | null>(
     null
@@ -446,22 +314,18 @@ useEffect(() => {
   const selectedDayKey = toDayKey(selectedDate);
   const selectedDateIsPast = isPastDay(selectedDate);
 
-  const ownTasks = tasks.filter((task) => !task.readonly);
-  const sharedTasks = tasks.filter((task) => task.readonly);
-  const completedCount = ownTasks.filter((task) => task.done).length;
-  const openCount = ownTasks.length - completedCount;
+  const completedCount = tasks.filter((task: SerializedTask) => task.done).length;
+  const openCount = tasks.length - completedCount;
 
   const datesWithTasks = useMemo(() => {
-    return Array.from(new Set(tasks.map((task) => task.date))).map((dayKey) =>
-      fromDayKey(dayKey)
-    );
-  }, [tasks]);
+  const dayKeys = tasks.map((task: SerializedTask) => task.date);
+  return [...new Set<string>(dayKeys)].map(fromDayKey);
+}, [tasks]);
 
   const tasksForSelectedDate = useMemo(() => {
     return tasks
-      .filter((task) => task.date === selectedDayKey)
-      .sort((a, b) => {
-        if (a.readonly !== b.readonly) return Number(a.readonly) - Number(b.readonly);
+      .filter((task: SerializedTask) => task.date === selectedDayKey)
+      .sort((a: SerializedTask, b: SerializedTask) => {
         if (a.done !== b.done) return Number(a.done) - Number(b.done);
         if (!a.time && !b.time) return 0;
         if (!a.time) return 1;
@@ -472,86 +336,42 @@ useEffect(() => {
 
   function dayHasTasks(date: Date) {
     const key = toDayKey(date);
-    return tasks.some((task) => task.date === key);
+    return tasks.some((task: SerializedTask) => task.date === key);
   }
 
-  async function handleAddTask() {
+  function handleAddTask() {
     const cleanTitle = title.trim();
 
-    if (!cleanTitle || selectedDateIsPast || isSaving) return;
+    if (!cleanTitle || selectedDateIsPast) return;
 
+    addTask({
+      title: cleanTitle,
+      date: selectedDayKey,
+      time,
+      urgency,
+      reminderMode,
+      trackingMode,
+      visibility: "private",
+    });
+
+    setTitle("");
+    setUrgency("normal");
+    setTime("");
+    setReminderMode("none");
+    setTrackingMode("reminder_only");
     setStatus("");
-    setIsSaving(true);
-
-    try {
-      const response = await fetch("/api/tasks", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: cleanTitle,
-          date: selectedDayKey,
-          time,
-          urgency,
-          reminderMode: reminderChannel,
-          trackingMode,
-          visibility,
-        }),
-      });
-
-      const data: TaskApiResponse = await response.json();
-
-      if (!response.ok || !data.ok || !data.task) {
-        setStatus(data.error ?? "Could not create task.");
-        return;
-      }
-
-      setTasks((current) => [...current, data.task!]);
-      setTitle("");
-      setUrgency("normal");
-      setTime("");
-      setReminderChannel("none");
-      setTrackingMode("reminder_only");
-      setVisibility("public");
-      setStatus("");
-    } catch {
-      setStatus("Could not create task.");
-    } finally {
-      setIsSaving(false);
-    }
   }
 
-  async function handleToggleTask(taskId: string) {
+  function handleToggleTask(taskId: string) {
     if (busyTaskId) return;
 
-    const task = tasks.find((item) => item.id === taskId);
+    const task = tasks.find((item: SerializedTask) => item.id === taskId);
 
-    if (!task || task.readonly || task.trackingMode !== "checkable") return;
+    if (!task || task.trackingMode !== "checkable") return;
 
-    setStatus("");
     setBusyTaskId(taskId);
-
-    try {
-      const response = await fetch(`/api/tasks/${taskId}/toggle`, {
-        method: "POST",
-      });
-
-      const data = (await response.json()) as TaskApiResponse;
-
-      if (!response.ok || !data.ok || !data.task) {
-        setStatus(data.error ?? "Could not update task.");
-        return;
-      }
-
-      setTasks((current) =>
-        current.map((item) => (item.id === taskId ? data.task! : item))
-      );
-    } catch {
-      setStatus("Could not update task.");
-    } finally {
-      setBusyTaskId(null);
-    }
+    toggleTask(taskId);
+    setBusyTaskId(null);
   }
 
   function toggleRecurringDay(day: number) {
@@ -567,21 +387,19 @@ useEffect(() => {
     setRecurringTitle("");
     setRecurringUrgency("normal");
     setRecurringTime("");
-    setRecurringReminderChannel("none");
+    setRecurringReminderMode("none");
     setRecurringTrackingMode("reminder_only");
-    setRecurringVisibility("public");
     setRecurringDays([1]);
     setShowRecurringCreateModal(true);
   }
 
-  function openEditRecurringModal(event: UiRecurringEvent) {
+  function openEditRecurringModal(event: SerializedRecurringEvent) {
     setEditingRecurringId(event.id);
     setRecurringTitle(event.title);
     setRecurringUrgency(event.urgency);
     setRecurringTime(event.time);
-    setRecurringReminderChannel(getRecurringReminderMode(event));
+    setRecurringReminderMode(event.reminderMode ?? "none");
     setRecurringTrackingMode(event.trackingMode);
-    setRecurringVisibility(event.visibility ?? "public");
     setRecurringDays(
       event.daysCsv
         .split(",")
@@ -591,7 +409,7 @@ useEffect(() => {
     setShowRecurringCreateModal(true);
   }
 
-  async function submitRecurringEvent() {
+  function submitRecurringEvent() {
     const cleanTitle = recurringTitle.trim();
 
     if (!cleanTitle || recurringDays.length === 0) {
@@ -599,122 +417,38 @@ useEffect(() => {
       return;
     }
 
-    setStatus("");
-
     const payload = {
       title: cleanTitle,
       time: recurringTime,
       urgency: recurringUrgency,
-      reminderMode: recurringReminderChannel,
+      reminderMode: recurringReminderMode,
       trackingMode: recurringTrackingMode,
-      visibility: recurringVisibility,
+      visibility: "private" as const,
       days: recurringDays,
       startDate: selectedDayKey,
     };
 
-    try {
-      const response = await fetch(
-        editingRecurringId
-          ? `/api/recurring-events/${editingRecurringId}`
-          : "/api/recurring-events",
-        {
-          method: editingRecurringId ? "PATCH" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      const data = (await response.json()) as RecurringApiResponse;
-
-      if (!response.ok || !data.ok || !data.event) {
-        setStatus(data.error ?? "Could not save recurring event.");
-        return;
-      }
-
-      if (editingRecurringId) {
-        setRecurringEvents((current) =>
-          current.map((event) =>
-            event.id === data.event!.id ? data.event! : event
-          )
-        );
-
-        setTasks((current) => {
-          const removed = new Set(data.deletedTaskIds ?? []);
-          const kept = current.filter((task) => !removed.has(task.id));
-          return [...kept, ...(data.tasks ?? [])];
-        });
-      } else {
-        setRecurringEvents((current) => [data.event!, ...current]);
-        setTasks((current) => [...current, ...(data.tasks ?? [])]);
-      }
-
-      setShowRecurringCreateModal(false);
-      setStatus("");
-    } catch {
-      setStatus("Could not save recurring event.");
+    if (editingRecurringId) {
+      updateRecurringEvent(editingRecurringId, payload);
+    } else {
+      addRecurringEvent(payload);
     }
+
+    setShowRecurringCreateModal(false);
+    setStatus("");
   }
 
-  async function deleteRecurringEvent(id: string) {
-    try {
-      const response = await fetch(`/api/recurring-events/${id}`, {
-        method: "DELETE",
-      });
-
-      const data = (await response.json()) as RecurringApiResponse;
-
-      if (!response.ok || !data.ok) {
-        setStatus(data.error ?? "Could not delete recurring event.");
-        return;
-      }
-
-      const deleted = new Set(data.deletedTaskIds ?? []);
-      setRecurringEvents((current) =>
-        current.filter((event) => event.id !== id)
-      );
-      setTasks((current) => current.filter((task) => !deleted.has(task.id)));
-      setStatus("");
-    } catch {
-      setStatus("Could not delete recurring event.");
-    }
+  function deleteCompletedForSelectedDay() {
+    deleteCompletedTasksForDate(selectedDayKey);
+    setStatus("");
   }
 
-  async function deleteCompletedForSelectedDay() {
-    try {
-      const response = await fetch("/api/tasks/delete-completed", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          date: selectedDayKey,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.ok) {
-        setStatus(data.error ?? "Could not delete completed tasks.");
-        return;
-      }
-
-      setTasks((current) =>
-        current.filter(
-          (task) =>
-            !(
-              !task.readonly &&
-              task.date === selectedDayKey &&
-              task.done
-            )
-        )
-      );
-
-      setStatus("");
-    } catch {
-      setStatus("Could not delete completed tasks.");
-    }
+  if (!ready) {
+    return (
+      <section className="theme-panel rounded-[28px] p-5">
+        <p className="text-sm theme-muted">Loading local app data...</p>
+      </section>
+    );
   }
 
   return (
@@ -724,23 +458,19 @@ useEffect(() => {
           <div>
             <p className="text-sm theme-muted">Welcome back</p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">
-              {userName}
+              Local Planner
             </h1>
-            <p className="mt-2 text-sm theme-muted">{userEmail}</p>
+            <p className="mt-2 text-sm theme-muted">
+              Stored locally on this device
+            </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div className="theme-card rounded-2xl px-4 py-3">
               <p className="text-xs uppercase tracking-[0.16em] theme-faint">
-                Yours
+                Total
               </p>
-              <p className="mt-2 text-2xl font-semibold">{ownTasks.length}</p>
-            </div>
-            <div className="theme-card rounded-2xl px-4 py-3">
-              <p className="text-xs uppercase tracking-[0.16em] theme-faint">
-                Shared
-              </p>
-              <p className="mt-2 text-2xl font-semibold">{sharedTasks.length}</p>
+              <p className="mt-2 text-2xl font-semibold">{tasks.length}</p>
             </div>
             <div className="theme-card rounded-2xl px-4 py-3">
               <p className="text-xs uppercase tracking-[0.16em] theme-faint">
@@ -768,7 +498,7 @@ useEffect(() => {
 
             <div className="inline-flex items-center gap-2 rounded-full theme-pill px-3 py-2 text-sm theme-muted">
               <CalendarIcon />
-              Yours + shared
+              Local tasks
             </div>
           </div>
 
@@ -860,14 +590,14 @@ useEffect(() => {
                       ? "Past dates are read-only"
                       : "Write what to do..."
                   }
-                  disabled={selectedDateIsPast || isSaving}
+                  disabled={selectedDateIsPast}
                   className="theme-input h-14 min-w-0 flex-1 rounded-2xl px-4 outline-none focus:border-indigo-300/30 disabled:cursor-not-allowed disabled:opacity-50"
                 />
 
                 <button
                   type="button"
                   onClick={handleAddTask}
-                  disabled={selectedDateIsPast || isSaving}
+                  disabled={selectedDateIsPast}
                   className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-300 to-sky-400 text-slate-950 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label="Add task"
                 >
@@ -881,9 +611,9 @@ useEffect(() => {
                   <select
                     value={urgency}
                     onChange={(event) =>
-                      setUrgency(event.target.value as UiUrgency)
+                      setUrgency(event.target.value as SerializedUrgency)
                     }
-                    disabled={selectedDateIsPast || isSaving}
+                    disabled={selectedDateIsPast}
                     className="theme-input h-12 rounded-2xl px-4 outline-none focus:border-indigo-300/30 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <option value="normal">Normal</option>
@@ -898,7 +628,7 @@ useEffect(() => {
                     type="time"
                     value={time}
                     onChange={(event) => setTime(event.target.value)}
-                    disabled={selectedDateIsPast || isSaving}
+                    disabled={selectedDateIsPast}
                     className="theme-input h-12 rounded-2xl px-4 outline-none focus:border-indigo-300/30 disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </label>
@@ -906,11 +636,13 @@ useEffect(() => {
                 <label className="grid min-w-0 gap-2">
                   <span className="text-sm theme-muted">Reminder</span>
                   <select
-                    value={reminderChannel}
+                    value={reminderMode}
                     onChange={(event) =>
-                      setReminderChannel(event.target.value as UiReminderChannel)
+                      setReminderMode(
+                        event.target.value as SerializedReminderMode
+                      )
                     }
-                    disabled={selectedDateIsPast || isSaving}
+                    disabled={selectedDateIsPast}
                     className="theme-input h-12 rounded-2xl px-4 outline-none focus:border-indigo-300/30 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <option value="none">No reminder</option>
@@ -923,32 +655,15 @@ useEffect(() => {
                   <select
                     value={trackingMode}
                     onChange={(event) =>
-                      setTrackingMode(event.target.value as UiTrackingMode)
+                      setTrackingMode(
+                        event.target.value as SerializedTrackingMode
+                      )
                     }
-                    disabled={selectedDateIsPast || isSaving}
+                    disabled={selectedDateIsPast}
                     className="theme-input h-12 rounded-2xl px-4 outline-none focus:border-indigo-300/30 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <option value="reminder_only">Reminder only</option>
                     <option value="checkable">Checkable</option>
-                  </select>
-                </label>
-
-                <label className="grid min-w-0 gap-2 md:col-span-2">
-                  <span className="text-sm theme-muted">Visibility</span>
-                  <select
-                    value={visibility}
-                    onChange={(event) =>
-                      setVisibility(event.target.value as UiTaskVisibility)
-                    }
-                    disabled={selectedDateIsPast || isSaving}
-                    className="theme-input h-12 rounded-2xl px-4 outline-none focus:border-indigo-300/30 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="public">
-                      Public - visible to accepted friends
-                    </option>
-                    <option value="private">
-                      Private - only visible to you
-                    </option>
                   </select>
                 </label>
               </div>
@@ -968,9 +683,7 @@ useEffect(() => {
             </div>
 
             <div className="mt-6">
-              {tasksForSelectedDate.some(
-                (task) => !task.readonly && task.done
-              ) ? (
+              {tasksForSelectedDate.some((task: SerializedTask) => task.done) ? (
                 <div className="mb-4 flex justify-end">
                   <button
                     type="button"
@@ -993,7 +706,7 @@ useEffect(() => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {tasksForSelectedDate.map((task) => (
+                  {tasksForSelectedDate.map((task: SerializedTask) => (
                     <TaskCard
                       key={task.id}
                       task={task}
@@ -1010,7 +723,9 @@ useEffect(() => {
 
       {showRecurringCreateModal ? (
         <Modal
-          title={editingRecurringId ? "Edit recurring event" : "Add recurring event"}
+          title={
+            editingRecurringId ? "Edit recurring event" : "Add recurring event"
+          }
           onClose={() => setShowRecurringCreateModal(false)}
         >
           <div className="grid gap-4">
@@ -1030,7 +745,9 @@ useEffect(() => {
                 <select
                   value={recurringUrgency}
                   onChange={(event) =>
-                    setRecurringUrgency(event.target.value as UiUrgency)
+                    setRecurringUrgency(
+                      event.target.value as SerializedUrgency
+                    )
                   }
                   className="theme-input h-12 rounded-2xl px-4 outline-none focus:border-indigo-300/30"
                 >
@@ -1053,16 +770,16 @@ useEffect(() => {
               <label className="grid gap-2">
                 <span className="text-sm theme-muted">Reminder</span>
                 <select
-                  value={recurringReminderChannel}
+                  value={recurringReminderMode}
                   onChange={(event) =>
-                    setRecurringReminderChannel(
-                      event.target.value as UiReminderChannel
+                    setRecurringReminderMode(
+                      event.target.value as SerializedReminderMode
                     )
                   }
                   className="theme-input h-12 rounded-2xl px-4 outline-none focus:border-indigo-300/30"
                 >
                   <option value="none">No reminder</option>
-                  <option value="push">Push only</option>
+                  <option value="push">Desktop reminder</option>
                 </select>
               </label>
 
@@ -1072,7 +789,7 @@ useEffect(() => {
                   value={recurringTrackingMode}
                   onChange={(event) =>
                     setRecurringTrackingMode(
-                      event.target.value as UiTrackingMode
+                      event.target.value as SerializedTrackingMode
                     )
                   }
                   className="theme-input h-12 rounded-2xl px-4 outline-none focus:border-indigo-300/30"
@@ -1082,22 +799,6 @@ useEffect(() => {
                 </select>
               </label>
             </div>
-
-            <label className="grid gap-2">
-              <span className="text-sm theme-muted">Visibility</span>
-              <select
-                value={recurringVisibility}
-                onChange={(event) =>
-                  setRecurringVisibility(event.target.value as UiTaskVisibility)
-                }
-                className="theme-input h-12 rounded-2xl px-4 outline-none focus:border-indigo-300/30"
-              >
-                <option value="public">
-                  Public - visible to accepted friends
-                </option>
-                <option value="private">Private - only visible to you</option>
-              </select>
-            </label>
 
             <div>
               <p className="mb-3 text-sm theme-muted">Repeat on</p>
@@ -1124,8 +825,8 @@ useEffect(() => {
 
             <div className="theme-card rounded-2xl px-4 py-3 text-sm theme-muted">
               This will create linked task occurrences from{" "}
-              <strong>{formatShortDate(selectedDate)}</strong> forward. Deleting
-              the recurring event removes those linked tasks everywhere.
+              <strong>{formatShortDate(selectedDate)}</strong> forward.
+              Deleting the recurring event removes those linked tasks.
             </div>
 
             <div className="flex justify-end">
@@ -1152,7 +853,7 @@ useEffect(() => {
             </div>
           ) : (
             <div className="space-y-3">
-              {recurringEvents.map((event) => (
+              {recurringEvents.map((event: SerializedRecurringEvent) => (
                 <div
                   key={event.id}
                   className="rounded-[24px] border p-4"
@@ -1164,6 +865,7 @@ useEffect(() => {
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
                       <p className="text-base font-semibold">{event.title}</p>
+
                       <div className="mt-2 flex flex-wrap gap-2">
                         <span
                           className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium capitalize ${getUrgencyClasses(
@@ -1178,15 +880,7 @@ useEffect(() => {
                         </span>
 
                         <span className="inline-flex items-center rounded-full theme-pill px-3 py-1 text-xs theme-muted">
-                          {getReminderLabel(getRecurringReminderMode(event))}
-                        </span>
-
-                        <span
-                          className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${getVisibilityClasses(
-                            event.visibility
-                          )}`}
-                        >
-                          {getVisibilityLabel(event.visibility)}
+                          {getReminderLabel(event.reminderMode)}
                         </span>
 
                         {event.time ? (
@@ -1209,6 +903,7 @@ useEffect(() => {
                       >
                         Edit
                       </button>
+
                       <button
                         type="button"
                         onClick={() => deleteRecurringEvent(event.id)}

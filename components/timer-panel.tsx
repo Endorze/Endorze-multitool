@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { showDesktopNotification } from "@/lib/desktop-notifications";
+import { useSoundSettings } from "@/providers/SoundSettingsProvider";
 
 function clampTimePart(value: string, max: number) {
   const digitsOnly = value.replace(/\D/g, "");
@@ -32,31 +33,9 @@ function partsToSeconds(hours: string, minutes: string, seconds: string) {
   return h * 3600 + m * 60 + s;
 }
 
-function playFinishedBeep() {
-  try {
-    const audioContext = new window.AudioContext();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-
-    oscillator.type = "sine";
-    oscillator.frequency.value = 880;
-    gainNode.gain.value = 0.05;
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + 0.8);
-
-    oscillator.onended = () => {
-      void audioContext.close();
-    };
-  } catch {
-    // ignore if audio context fails
-  }
-}
-
 export default function TimerPanel() {
+  const { playSound } = useSoundSettings();
+
   const [hoursInput, setHoursInput] = useState("00");
   const [minutesInput, setMinutesInput] = useState("25");
   const [secondsInput, setSecondsInput] = useState("00");
@@ -97,9 +76,16 @@ export default function TimerPanel() {
             window.clearInterval(intervalRef.current);
             intervalRef.current = null;
           }
+
           setIsRunning(false);
-          showDesktopNotification("Timer finished", "Your timer has completed.");
-          playFinishedBeep();
+
+          void showDesktopNotification(
+            "Timer finished",
+            "Your timer has completed."
+          );
+
+          void playSound("timer", 4000);
+
           return 0;
         }
 
@@ -113,7 +99,7 @@ export default function TimerPanel() {
         intervalRef.current = null;
       }
     };
-  }, [isRunning]);
+  }, [isRunning, playSound]);
 
   function handleStart() {
     if (remainingSeconds <= 0) return;
@@ -248,7 +234,8 @@ export default function TimerPanel() {
           </div>
 
           <p className="mt-4 text-sm theme-muted">
-            When the timer finishes, it plays a local beep in the browser.
+            When the timer finishes, it sends a desktop notification and plays
+            your timer sound briefly.
           </p>
         </div>
       </div>

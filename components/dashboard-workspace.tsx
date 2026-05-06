@@ -6,9 +6,9 @@ import {
   BellRing,
   CalendarDays,
   Clock3,
+  Focus,
   Music2,
   Settings,
-  Users,
   Wrench,
 } from "lucide-react";
 import PlannerDashboard from "@/components/planner-dashboard";
@@ -17,52 +17,7 @@ import MusicTab from "@/components/music-tab";
 import AlarmPanel from "@/components/alarm-panel";
 import SettingsModal from "@/components/settings-modal";
 import ToolsPanel from "@/components/tools-panel";
-import SharedCalendarsPanel from "@/components/shared-calendars-panel";
-
-type UiUrgency = "normal" | "important" | "deadline";
-type UiReminderChannel = "push" | "none";
-type UiTrackingMode = "checkable" | "reminder_only";
-type UiTaskVisibility = "public" | "private";
-
-type UiTask = {
-  id: string;
-  title: string;
-  date: string;
-  time: string;
-  done: boolean;
-  urgency: UiUrgency;
-  trackingMode: UiTrackingMode;
-  visibility?: UiTaskVisibility;
-  reminderMode?: UiReminderChannel;
-  reminderChannel?: UiReminderChannel;
-  recurringEventId?: string;
-
-  ownerId?: string;
-  ownerName?: string;
-  ownerEmail?: string;
-  readonly?: boolean;
-};
-
-type UiRecurringEvent = {
-  id: string;
-  title: string;
-  time: string;
-  urgency: UiUrgency;
-  trackingMode: UiTrackingMode;
-  visibility?: UiTaskVisibility;
-  reminderMode?: UiReminderChannel;
-  reminderChannel?: UiReminderChannel;
-  daysCsv: string;
-  startDate: string;
-  active: boolean;
-};
-
-type DashboardWorkspaceProps = {
-  userName: string;
-  userEmail: string;
-  initialTasks: UiTask[];
-  recurringEvents: UiRecurringEvent[];
-};
+import FocusVisualizer from "@/components/focus-visualizer";
 
 function TabButton({
   active,
@@ -89,12 +44,7 @@ function TabButton({
   );
 }
 
-export default function DashboardWorkspace({
-  userName,
-  userEmail,
-  initialTasks,
-  recurringEvents,
-}: DashboardWorkspaceProps) {
+export default function DashboardWorkspace() {
   const { activeTab, goToTab } = useTabHistory();
   const [showSettings, setShowSettings] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -105,11 +55,13 @@ export default function DashboardWorkspace({
         <section className="theme-panel rounded-[28px] p-4 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
-              <p className="text-sm theme-muted">Desktop workspace</p>
+              <p className="text-sm theme-muted">Local desktop workspace</p>
               <h1 className="truncate text-2xl font-semibold tracking-tight">
-                {userName}
+                Task Calendar
               </h1>
-              <p className="mt-1 truncate text-sm theme-muted">{userEmail}</p>
+              <p className="mt-1 truncate text-sm theme-muted">
+                Your data stays on this device.
+              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -119,14 +71,6 @@ export default function DashboardWorkspace({
                 icon={<CalendarDays className="h-4 w-4" />}
               >
                 Calendar
-              </TabButton>
-
-              <TabButton
-                active={activeTab === "shared"}
-                onClick={() => goToTab("shared")}
-                icon={<Users className="h-4 w-4" />}
-              >
-                Shared calendars
               </TabButton>
 
               <TabButton
@@ -176,21 +120,9 @@ export default function DashboardWorkspace({
           </div>
         </section>
 
-        {activeTab === "calendar" ? (
-          <PlannerDashboard
-            userName={userName}
-            userEmail={userEmail}
-            initialTasks={initialTasks}
-            recurringEvents={recurringEvents}
-          />
-        ) : null}
-
-        {activeTab === "shared" ? <SharedCalendarsPanel /> : null}
-
+        {activeTab === "calendar" ? <PlannerDashboard /> : null}
         {activeTab === "timer" ? <TimerPanel /> : null}
-
         {activeTab === "alarms" ? <AlarmPanel /> : null}
-
         {activeTab === "music" ? <MusicTab /> : null}
       </div>
 
@@ -199,6 +131,7 @@ export default function DashboardWorkspace({
       {showSettings ? (
         <SettingsModal onClose={() => setShowSettings(false)} />
       ) : null}
+      <FocusVisualizer />
     </>
   );
 }

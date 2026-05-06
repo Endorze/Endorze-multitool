@@ -8,27 +8,38 @@ import {
   useRef,
   useState,
 } from "react";
+import { useSoundSettings } from "@/providers/SoundSettingsProvider";
+import { showDesktopNotification } from "@/lib/desktop-notifications";
 
 export type AlarmType = "one_time" | "repeating";
 
 export type AlarmItem = {
   id: string;
   label: string;
-  time: string; // HH:mm
+  time: string;
   type: AlarmType;
   enabled: boolean;
   days: number[];
-  date?: string; // yyyy-MM-dd
+  date?: string;
   sound?: string | null;
   lastTriggeredAt?: string | null;
 };
 
+type ActiveAlarm = {
+  alarmId: string;
+  label: string;
+  time: string;
+};
+
 type AlarmContextValue = {
   alarms: AlarmItem[];
+  activeAlarm: ActiveAlarm | null;
   addAlarm: (alarm: AlarmItem) => void;
   updateAlarm: (id: string, updater: (alarm: AlarmItem) => AlarmItem) => void;
   deleteAlarm: (id: string) => void;
   toggleAlarm: (id: string) => void;
+  dismissActiveAlarm: () => void;
+  snoozeActiveAlarm: () => void;
 };
 
 const AlarmContext = createContext<AlarmContextValue | null>(null);
@@ -50,74 +61,113 @@ function getNowParts() {
   };
 }
 
-function playDefaultAlarmSound() {
-  try {
-    const AudioContextClass =
-      window.AudioContext ||
-      // @ts-expect-error browser prefix fallback
-      window.webkitAudioContext;
+function addMinutesToNow(minutes: number) {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() + minutes);
 
-    if (!AudioContextClass) return;
+  const yyyy = date.getFullYear();
+  const mm = `${date.getMonth() + 1}`.padStart(2, "0");
+  const dd = `${date.getDate()}`.padStart(2, "0");
+  const hh = `${date.getHours()}`.padStart(2, "0");
+  const min = `${date.getMinutes()}`.padStart(2, "0");
 
-    const audioContext = new AudioContextClass();
-
-    const notes = [880, 660, 880, 660];
-    let startAt = audioContext.currentTime;
-
-    for (const frequency of notes) {
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator.type = "sine";
-      oscillator.frequency.value = frequency;
-
-      gainNode.gain.setValueAtTime(0.001, startAt);
-      gainNode.gain.exponentialRampToValueAtTime(0.08, startAt + 0.02);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, startAt + 0.38);
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      oscillator.start(startAt);
-      oscillator.stop(startAt + 0.4);
-
-      startAt += 0.25;
-    }
-
-    window.setTimeout(() => {
-      void audioContext.close().catch(() => undefined);
-    }, 1800);
-  } catch {
-    // ignore sound errors
-  }
+  return {
+    date: `${yyyy}-${mm}-${dd}`,
+    time: `${hh}:${min}`,
+  };
 }
 
-async function showAlarmNotification(label: string, body: string) {
-  try {
-    if (!("Notification" in window)) return;
+export function AlarmProvider({ children }: { children: React.ReactNode }) {
+  const { startSound } = useSoundSettings();
 
-    if (Notification.permission === "default") {
-      await Notification.requestPermission();
-    }
-
-    if (Notification.permission === "granted") {
-      new Notification(label, {
-        body,
-        icon: "/icon-192.png",
-      });
-    }
-  } catch {
-    // ignore notification errors
-  }
-}
-
-export function AlarmProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
   const [alarms, setAlarms] = useState<AlarmItem[]>([]);
+  const [activeAlarm, setActiveAlarm] = useState<ActiveAlarm | null>(null);
+
   const intervalRef = useRef<number | null>(null);
+  const stopSoundRefs = useRef<Array<() => void>>([]);
+  const firingKeysRef = useRef<Set<string>>(new Set());
+  const activeAlarmRef = useRef<ActiveAlarm | null>(null);
+  const startSoundRef = useRef(startSound);
+
+  useEffect(() => {
+    startSoundRef.current = startSound;
+  }, [startSound]);
+
+  useEffect(() => {
+    activeAlarmRef.current = activeAlarm;
+  }, [activeAlarm]);
+
+  function stopAllAlarmSounds() {
+    for (const stop of stopSoundRefs.current) {
+      try {
+        stop();
+      } catch {
+        // ignore stop errors
+      }
+    }
+
+    stopSoundRefs.current = [];
+  }
+
+  async function fireAlarm(alarm: AlarmItem, triggerKey: string) {
+    const lockKey = `${alarm.id}:${triggerKey}`;
+
+    if (firingKeysRef.current.has(lockKey)) return;
+
+    firingKeysRef.current.add(lockKey);
+
+    stopAllAlarmSounds();
+
+    const nextActiveAlarm = {
+      alarmId: alarm.id,
+      label: alarm.label || "Alarm",
+      time: alarm.time,
+    };
+
+    activeAlarmRef.current = nextActiveAlarm;
+    setActiveAlarm(nextActiveAlarm);
+
+    void showDesktopNotification(
+      alarm.label || "Alarm",
+      `Alarm for ${alarm.time}`
+    );
+
+    const stop = await startSoundRef.current("alarm", { loop: true });
+    stopSoundRefs.current.push(stop);
+  }
+
+  function dismissActiveAlarm() {
+    stopAllAlarmSounds();
+    activeAlarmRef.current = null;
+    setActiveAlarm(null);
+  }
+
+  function snoozeActiveAlarm() {
+    const currentAlarm = activeAlarmRef.current;
+    if (!currentAlarm) return;
+
+    const snoozeTime = addMinutesToNow(5);
+
+    stopAllAlarmSounds();
+
+    setAlarms((current) => [
+      ...current,
+      {
+        id: crypto.randomUUID(),
+        label: `${currentAlarm.label} (snoozed)`,
+        date: snoozeTime.date,
+        time: snoozeTime.time,
+        type: "one_time",
+        enabled: true,
+        days: [],
+        sound: null,
+        lastTriggeredAt: null,
+      },
+    ]);
+
+    activeAlarmRef.current = null;
+    setActiveAlarm(null);
+  }
 
   useEffect(() => {
     try {
@@ -125,9 +175,7 @@ export function AlarmProvider({
       if (!raw) return;
 
       const parsed = JSON.parse(raw) as AlarmItem[];
-      if (Array.isArray(parsed)) {
-        setAlarms(parsed);
-      }
+      if (Array.isArray(parsed)) setAlarms(parsed);
     } catch {
       // ignore bad storage
     }
@@ -142,30 +190,26 @@ export function AlarmProvider({
   }, [alarms]);
 
   useEffect(() => {
+    if (intervalRef.current !== null) {
+      window.clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
     intervalRef.current = window.setInterval(() => {
       const { dateKey, timeKey, dayOfWeek } = getNowParts();
+      const triggerKey = `${dateKey}-${timeKey}`;
 
       setAlarms((current) => {
         let changed = false;
 
         const next = current.map((alarm) => {
           if (!alarm.enabled) return alarm;
-
-          const triggerKey = `${dateKey}-${timeKey}`;
-
-          if (alarm.lastTriggeredAt === triggerKey) {
-            return alarm;
-          }
+          if (alarm.lastTriggeredAt === triggerKey) return alarm;
 
           if (alarm.type === "one_time") {
             if (alarm.date === dateKey && alarm.time === timeKey) {
               changed = true;
-
-              void showAlarmNotification(
-                alarm.label || "Alarm",
-                `Alarm for ${alarm.time}`
-              );
-              playDefaultAlarmSound();
+              void fireAlarm(alarm, triggerKey);
 
               return {
                 ...alarm,
@@ -182,12 +226,7 @@ export function AlarmProvider({
 
           if (shouldFireToday) {
             changed = true;
-
-            void showAlarmNotification(
-              alarm.label || "Repeating alarm",
-              `Alarm for ${alarm.time}`
-            );
-            playDefaultAlarmSound();
+            void fireAlarm(alarm, triggerKey);
 
             return {
               ...alarm,
@@ -205,13 +244,17 @@ export function AlarmProvider({
     return () => {
       if (intervalRef.current !== null) {
         window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
+
+      stopAllAlarmSounds();
     };
   }, []);
 
   const value = useMemo<AlarmContextValue>(
     () => ({
       alarms,
+      activeAlarm,
       addAlarm: (alarm) => {
         setAlarms((current) => [...current, alarm]);
       },
@@ -230,12 +273,50 @@ export function AlarmProvider({
           )
         );
       },
+      dismissActiveAlarm,
+      snoozeActiveAlarm,
     }),
-    [alarms]
+    [alarms, activeAlarm]
   );
 
   return (
-    <AlarmContext.Provider value={value}>{children}</AlarmContext.Provider>
+    <AlarmContext.Provider value={value}>
+      {children}
+
+      {activeAlarm ? (
+        <div className="fixed bottom-24 right-5 z-[130] w-[min(420px,calc(100vw-2.5rem))]">
+          <div className="theme-panel rounded-[28px] border border-[var(--line)] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
+            <div className="mb-4">
+              <p className="text-sm theme-muted">Alarm</p>
+              <h3 className="mt-1 truncate text-xl font-semibold">
+                {activeAlarm.label}
+              </h3>
+              <p className="mt-2 text-sm theme-muted">
+                Alarm scheduled for {activeAlarm.time}.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={snoozeActiveAlarm}
+                className="theme-button-soft rounded-2xl px-5 py-3 text-sm font-medium"
+              >
+                Snooze 5 min
+              </button>
+
+              <button
+                type="button"
+                onClick={dismissActiveAlarm}
+                className="rounded-2xl bg-gradient-to-br from-emerald-300 to-sky-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:scale-[1.01]"
+              >
+                Turn off alarm
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </AlarmContext.Provider>
   );
 }
 

@@ -25,7 +25,10 @@
     ],
     "security": {
       "csp": null,
-      "dangerousDisableAssetCspModification": true
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/music/*", "$APPDATA/sounds/*"]
+      }
     }
   },
   "bundle": {

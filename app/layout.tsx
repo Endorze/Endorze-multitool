@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { MusicProvider } from "@/providers/MusicProvider";
 import { AlarmProvider } from "@/providers/AlarmProvider";
+import { SoundSettingsProvider } from "@/providers/SoundSettingsProvider";
 
 export const metadata: Metadata = {
-  title: "Task Calendar Prototype",
+  title: "Task Calendar",
   description:
-    "Modern task calendar with Google login, reminders, alarms, music, and push notifications.",
+    "Local desktop task calendar with reminders, alarms, timers, music, and utilities.",
 };
 
 export default function RootLayout({
@@ -18,7 +19,9 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <MusicProvider>
-          <AlarmProvider>{children}</AlarmProvider>
+          <SoundSettingsProvider>
+            <AlarmProvider>{children}</AlarmProvider>
+          </SoundSettingsProvider>
         </MusicProvider>
       </body>
     </html>

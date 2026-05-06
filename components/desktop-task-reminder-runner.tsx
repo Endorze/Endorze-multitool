@@ -2,21 +2,9 @@
 
 import { useEffect } from "react";
 import { showDesktopNotification } from "@/lib/desktop-notifications";
-
-type UiTask = {
-  id: string;
-  title: string;
-  date: string;
-  time: string;
-  done: boolean;
-  urgency: "normal" | "important" | "deadline";
-  reminderMode?: "none" | "push" | "email" | "both";
-};
-
-type ApiResponse = {
-  ok: boolean;
-  tasks?: UiTask[];
-};
+import { useAppData } from "@/providers/AppDataProviders";
+import { useSoundSettings } from "@/providers/SoundSettingsProvider";
+import type { SerializedTask } from "@/lib/recurring";
 
 function todayKey() {
   const now = new Date();
@@ -36,11 +24,11 @@ function tomorrowKey() {
   return `${y}-${m}-${d}`;
 }
 
-function wantsDesktopReminder(task: UiTask) {
-  return task.reminderMode === "push" || task.reminderMode === "both";
+function wantsDesktopReminder(task: SerializedTask) {
+  return task.reminderMode === "push";
 }
 
-function minutesUntilTask(task: UiTask) {
+function minutesUntilTask(task: SerializedTask) {
   if (!task.time) return null;
 
   const due = new Date(`${task.date}T${task.time}:00`);
@@ -58,68 +46,59 @@ function markSent(key: string) {
 }
 
 export default function DesktopTaskReminderRunner() {
+  const { ready, tasks } = useAppData();
+  const { playSound } = useSoundSettings();
+
   useEffect(() => {
+    if (!ready) return;
+
+    async function sendTaskReminder(
+      key: string,
+      title: string,
+      body: string
+    ) {
+      if (alreadySent(key)) return;
+
+      const sent = await showDesktopNotification(title, body);
+      await playSound("task");
+
+      if (sent) markSent(key);
+    }
+
     async function checkReminders() {
-      try {
-        const response = await fetch("/api/tasks/reminder-snapshot", {
-          cache: "no-store",
-        });
+      const today = todayKey();
+      const tomorrow = tomorrowKey();
 
-        const data = (await response.json()) as ApiResponse;
+      for (const task of tasks) {
+        if (task.done || !wantsDesktopReminder(task)) continue;
 
-        if (!response.ok || !data.ok || !data.tasks) return;
-
-        const today = todayKey();
-        const tomorrow = tomorrowKey();
-
-        for (const task of data.tasks) {
-          if (task.done || !wantsDesktopReminder(task)) continue;
-
-          if (task.urgency === "deadline" && task.date === tomorrow) {
-            const key = `desktop-reminder:${task.id}:deadline-tomorrow`;
-
-            if (!alreadySent(key)) {
-              const sent = await showDesktopNotification(
-                "Deadline tomorrow",
-                `${task.title} is due tomorrow.`
-              );
-
-              if (sent) markSent(key);
-            }
-          }
-
-          if (task.urgency === "deadline" && task.date === today) {
-            const key = `desktop-reminder:${task.id}:deadline-today`;
-
-            if (!alreadySent(key)) {
-              const sent = await showDesktopNotification(
-                "Deadline today",
-                `${task.title} is due today.`
-              );
-
-              if (sent) markSent(key);
-            }
-          }
-
-          const minutesLeft = minutesUntilTask(task);
-
-          if (minutesLeft !== null && minutesLeft <= 60 && minutesLeft >= 0) {
-            const key = `desktop-reminder:${task.id}:within-one-hour`;
-
-            if (!alreadySent(key)) {
-              const sent = await showDesktopNotification(
-                "Task coming up",
-                `${task.title} starts in ${minutesLeft} minute${
-                  minutesLeft === 1 ? "" : "s"
-                }.`
-              );
-
-              if (sent) markSent(key);
-            }
-          }
+        if (task.urgency === "deadline" && task.date === tomorrow) {
+          await sendTaskReminder(
+            `desktop-reminder:${task.id}:deadline-tomorrow`,
+            "Deadline tomorrow",
+            `${task.title} is due tomorrow.`
+          );
         }
-      } catch {
-        // ignore polling errors
+
+        if (task.urgency === "deadline" && task.date === today) {
+          await sendTaskReminder(
+            `desktop-reminder:${task.id}:deadline-today`,
+            "Deadline today",
+            `${task.title} is due today.`
+          );
+        }
+
+        const minutesLeft = minutesUntilTask(task);
+
+        if (minutesLeft !== null && minutesLeft <= 60 && minutesLeft >= 0) {
+          await sendTaskReminder(
+            `desktop-reminder:${task.id}:within-one-hour`,
+            "Task coming up",
+            `${task.title} starts in ${minutesLeft} minute${
+              minutesLeft === 1 ? "" : "s"
+            }.`
+          );
+        }
       }
     }
 
@@ -130,7 +109,7 @@ export default function DesktopTaskReminderRunner() {
     }, 15_000);
 
     return () => window.clearInterval(interval);
-  }, []);
+  }, [ready, tasks, playSound]);
 
   return null;
 }

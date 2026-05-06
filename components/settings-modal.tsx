@@ -1,15 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   BellRing,
   HardDrive,
   Music2,
+  Play,
+  RotateCcw,
   Settings,
+  Upload,
   Volume2,
   X,
 } from "lucide-react";
 import { PushManagerCard } from "@/components/push-manager";
+import { useSoundSettings } from "@/providers/SoundSettingsProvider";
+import type { SoundSlot } from "@/lib/sound-settings";
 
 type SettingsSection = "notifications" | "sounds" | "storage" | "about";
 
@@ -35,6 +40,83 @@ function SidebarButton({
       {icon}
       {children}
     </button>
+  );
+}
+
+function SoundPicker({
+  slot,
+  title,
+  description,
+}: {
+  slot: SoundSlot;
+  title: string;
+  description: string;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const { settings, setCustomSound, clearCustomSound, playSound } =
+    useSoundSettings();
+
+  const sound = settings[slot];
+
+  async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    await setCustomSound(slot, file);
+    event.target.value = "";
+  }
+
+  return (
+    <section className="theme-surface rounded-[28px] p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h4 className="text-lg font-semibold">{title}</h4>
+          <p className="mt-2 text-sm leading-6 theme-muted">{description}</p>
+          <p className="mt-3 truncate text-sm theme-faint">
+            Current: {sound ? sound.name : "Built-in fallback sound"}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="theme-button-accent inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium"
+          >
+            <Upload className="h-4 w-4" />
+            Upload MP3
+          </button>
+
+          <button
+            type="button"
+            onClick={() => playSound(slot)}
+            className="theme-button-soft inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium"
+          >
+            <Play className="h-4 w-4" />
+            Preview
+          </button>
+
+          <button
+            type="button"
+            onClick={() => clearCustomSound(slot)}
+            disabled={!sound}
+            className="theme-button-soft inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Reset
+          </button>
+
+          <input
+            ref={inputRef}
+            type="file"
+            accept="audio/mpeg,.mp3"
+            hidden
+            onChange={handleUpload}
+          />
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -113,34 +195,29 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             </button>
           </div>
 
-          {section === "notifications" ? <PushManagerCard variant="settings" /> : null}
+          {section === "notifications" ? (
+            <PushManagerCard variant="settings" />
+          ) : null}
 
           {section === "sounds" ? (
             <div className="grid gap-4">
-              <section className="theme-surface rounded-[28px] p-5">
-                <div className="flex items-start gap-3">
-                  <div className="grid h-12 w-12 place-items-center rounded-2xl theme-card">
-                    <Volume2 className="h-5 w-5" />
-                  </div>
+              <SoundPicker
+                slot="task"
+                title="Task notification sound"
+                description="Plays when a task reminder fires."
+              />
 
-                  <div>
-                    <h4 className="text-lg font-semibold">Sound settings</h4>
-                    <p className="mt-2 text-sm leading-6 theme-muted">
-                      Next step: add custom MP3 selection for alarm sounds,
-                      notification sounds, and timer-finished sounds.
-                    </p>
-                  </div>
-                </div>
-              </section>
+              <SoundPicker
+                slot="alarm"
+                title="Alarm sound"
+                description="Plays when one-time or repeating alarms fire."
+              />
 
-              <section className="theme-surface rounded-[28px] p-5">
-                <h4 className="font-semibold">Planned behavior</h4>
-                <p className="mt-2 text-sm leading-6 theme-muted">
-                  Notifications should play a short sound. Alarms should keep
-                  playing until dismissed or snoozed. Timer completion should use
-                  its own finish sound.
-                </p>
-              </section>
+              <SoundPicker
+                slot="timer"
+                title="Timer finished sound"
+                description="Plays when the countdown timer reaches zero."
+              />
             </div>
           ) : null}
 
@@ -153,10 +230,12 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
                   </div>
 
                   <div>
-                    <h4 className="text-lg font-semibold">Local desktop storage</h4>
+                    <h4 className="text-lg font-semibold">
+                      Local desktop storage
+                    </h4>
                     <p className="mt-2 text-sm leading-6 theme-muted">
-                      Music and alarm files should eventually be copied into the
-                      app data folder so they survive app restarts.
+                      Tasks, music, alarms, and custom sounds are stored locally
+                      in the app data folder.
                     </p>
                   </div>
                 </div>
