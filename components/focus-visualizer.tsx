@@ -180,32 +180,33 @@ function RadialOrbCanvas({
   }, [frequencyData, bassLevel, volumeLevel]);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  const canvasElement = canvasRef.current;
+  if (!canvasElement) return;
 
-    const context = canvas.getContext("2d");
-    if (!context) return;
+  const context = canvasElement.getContext("2d");
+  if (!context) return;
 
-    const ctx = context;
+  const canvas = canvasElement;
+  const ctx = context;
 
-    colorRef.current.transitionStart = performance.now();
+  colorRef.current.transitionStart = performance.now();
 
-    let mounted = true;
+  let mounted = true;
 
-    function resizeCanvas() {
-      const parent = canvas.parentElement;
-      if (!parent) return;
+  function resizeCanvas() {
+    const parent = canvas.parentElement;
+    if (!parent) return;
 
-      const size = Math.min(parent.clientWidth, parent.clientHeight);
-      const dpr = window.devicePixelRatio || 1;
+    const size = Math.min(parent.clientWidth, parent.clientHeight);
+    const dpr = window.devicePixelRatio || 1;
 
-      canvas.width = size * dpr;
-      canvas.height = size * dpr;
-      canvas.style.width = `${size}px`;
-      canvas.style.height = `${size}px`;
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    canvas.style.width = `${size}px`;
+    canvas.style.height = `${size}px`;
 
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
 
     function getPalette(now: number) {
       const colorState = colorRef.current;

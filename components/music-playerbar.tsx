@@ -12,6 +12,7 @@ import {
   Music4,
 } from "lucide-react";
 import { useMusic } from "@/providers/MusicProvider";
+import { useTabHistory } from "@/providers/TabHistoryProvider";
 
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds <= 0) {
@@ -46,6 +47,12 @@ export default function MusicPlayerBar() {
   const currentTrack = tracks[currentIndex];
   const progressValue = duration > 0 ? currentTime : 0;
 
+  const { activeTab } = useTabHistory();
+
+  if (activeTab === "watch") {
+    return null;
+  }
+
   return (
     <div className="music-dock fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--line)] px-4 py-3 backdrop-blur-xl">
       <div className="grid items-center gap-4 lg:grid-cols-[1fr_minmax(360px,620px)_1fr]">
@@ -69,9 +76,8 @@ export default function MusicPlayerBar() {
             <button
               type="button"
               onClick={() => setShuffle(!shuffle)}
-              className={`music-control-btn ${
-                shuffle ? "music-control-active" : ""
-              }`}
+              className={`music-control-btn ${shuffle ? "music-control-active" : ""
+                }`}
               aria-label="Toggle shuffle"
             >
               <Shuffle className="h-4 w-4" />

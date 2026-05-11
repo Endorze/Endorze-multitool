@@ -3,6 +3,7 @@ import "./globals.css";
 import { MusicProvider } from "@/providers/MusicProvider";
 import { AlarmProvider } from "@/providers/AlarmProvider";
 import { SoundSettingsProvider } from "@/providers/SoundSettingsProvider";
+import { WatchRoomProvider } from "@/providers/WatchRoomProvider";
 
 export const metadata: Metadata = {
   title: "Task Calendar",
@@ -19,9 +20,11 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <MusicProvider>
-          <SoundSettingsProvider>
-            <AlarmProvider>{children}</AlarmProvider>
-          </SoundSettingsProvider>
+          <WatchRoomProvider>
+            <SoundSettingsProvider>
+              <AlarmProvider>{children}</AlarmProvider>
+            </SoundSettingsProvider>
+          </WatchRoomProvider>
         </MusicProvider>
       </body>
     </html>

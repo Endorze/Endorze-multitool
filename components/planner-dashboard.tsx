@@ -492,7 +492,7 @@ export default function PlannerDashboard() {
         <div className="theme-panel h-fit rounded-[32px] p-4 sm:p-6">
           <div className="mb-5 flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm theme-muted">Planner view</p>
+              <p className="text-sm theme-muted">Select a date and start making plans</p>
               <h2 className="mt-1 text-2xl font-semibold">Monthly calendar</h2>
             </div>
 
@@ -544,11 +544,6 @@ export default function PlannerDashboard() {
               }}
             />
           </div>
-
-          <p className="mt-4 text-sm theme-faint">
-            Past dates stay viewable if they already contain tasks. Past empty
-            dates remain unavailable.
-          </p>
         </div>
 
         <div className="theme-panel h-fit rounded-[32px] p-4 sm:p-6">

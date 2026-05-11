@@ -2,7 +2,13 @@
 
 import { createContext, useContext, useMemo, useState } from "react";
 
-export type AppTab = "calendar" | "shared" | "timer" | "alarms" | "music";
+export type AppTab =
+  | "calendar"
+  | "shared"
+  | "timer"
+  | "alarms"
+  | "music"
+  | "watch";
 
 type TitlebarOverride = {
   title: string;

@@ -134,17 +134,11 @@ export default function TimerPanel() {
 
   return (
     <section className="theme-panel rounded-[32px] p-4 sm:p-6">
-      <div className="mb-6">
-        <p className="text-sm theme-muted">Utility tools</p>
-        <h2 className="mt-1 text-2xl font-semibold">Timer</h2>
-        <p className="mt-2 text-sm theme-muted">
-          Set any countdown using hours, minutes, and seconds.
-        </p>
-      </div>
+     
 
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <div className="theme-surface rounded-[28px] p-5">
-          <p className="mb-4 text-sm theme-muted">Set duration</p>
+  
 
           <div className="flex items-center justify-center gap-3">
             <div className="grid gap-2">
@@ -232,11 +226,6 @@ export default function TimerPanel() {
               Reset
             </button>
           </div>
-
-          <p className="mt-4 text-sm theme-muted">
-            When the timer finishes, it sends a desktop notification and plays
-            your timer sound briefly.
-          </p>
         </div>
       </div>
     </section>

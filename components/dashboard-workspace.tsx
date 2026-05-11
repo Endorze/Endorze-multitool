@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTabHistory } from "@/providers/TabHistoryProvider";
 import {
   BellRing,
@@ -18,6 +18,9 @@ import AlarmPanel from "@/components/alarm-panel";
 import SettingsModal from "@/components/settings-modal";
 import ToolsPanel from "@/components/tools-panel";
 import FocusVisualizer from "@/components/focus-visualizer";
+import { Clapperboard } from "lucide-react";
+import { useMusic } from "@/providers/MusicProvider";
+import WatchTogetherTab from "./watch-together-tab";
 
 function TabButton({
   active,
@@ -34,9 +37,8 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium transition ${
-        active ? "theme-button-accent" : "theme-button-soft"
-      }`}
+      className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium transition ${active ? "theme-button-accent" : "theme-button-soft"
+        }`}
     >
       {icon}
       {children}
@@ -48,6 +50,38 @@ export default function DashboardWorkspace() {
   const { activeTab, goToTab } = useTabHistory();
   const [showSettings, setShowSettings] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState("");
+  const { isPlaying, pauseMusic } = useMusic();
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+
+      const formatted = now.toLocaleString([], {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+      setCurrentTime(formatted);
+    };
+
+    updateTime();
+
+    const interval = setInterval(updateTime, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "watch" && isPlaying) {
+      pauseMusic();
+    }
+  }, [activeTab, isPlaying, pauseMusic]);
 
   return (
     <>
@@ -55,12 +89,12 @@ export default function DashboardWorkspace() {
         <section className="theme-panel rounded-[28px] p-4 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
-              <p className="text-sm theme-muted">Local desktop workspace</p>
+              <p className="text-sm theme-muted">{currentTime}</p>
               <h1 className="truncate text-2xl font-semibold tracking-tight">
-                Task Calendar
+                Multi-tool
               </h1>
               <p className="mt-1 truncate text-sm theme-muted">
-                Your data stays on this device.
+                Your data is stored locally on your device
               </p>
             </div>
 
@@ -97,6 +131,14 @@ export default function DashboardWorkspace() {
                 Music
               </TabButton>
 
+              <TabButton
+                active={activeTab === "watch"}
+                onClick={() => goToTab("watch")}
+                icon={<Clapperboard className="h-4 w-4" />}
+              >
+                Watch
+              </TabButton>
+
               <button
                 type="button"
                 onClick={() => setToolsOpen(true)}
@@ -124,6 +166,7 @@ export default function DashboardWorkspace() {
         {activeTab === "timer" ? <TimerPanel /> : null}
         {activeTab === "alarms" ? <AlarmPanel /> : null}
         {activeTab === "music" ? <MusicTab /> : null}
+        {activeTab === "watch" ? <WatchTogetherTab /> : null}
       </div>
 
       {toolsOpen ? <ToolsPanel onClose={() => setToolsOpen(false)} /> : null}

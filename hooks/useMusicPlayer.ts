@@ -335,6 +335,12 @@ export function useMusicPlayer() {
     setIsPlaying(true);
   }
 
+  function pauseMusic() {
+    audioRef.current?.pause();
+    setIsPlaying(false);
+    stopAnalyserLoop();
+  }
+
   function next() {
     if (!tracks.length) return;
 
@@ -476,6 +482,7 @@ export function useMusicPlayer() {
     duration,
     currentTime,
     volume,
+    pauseMusic,
     setShuffle,
     setLoop,
     setVolume,
